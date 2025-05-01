@@ -63,6 +63,10 @@ dependencies {
 	testImplementation 'org.mockito:mockito-core'
 	testImplementation 'org.junit.jupiter:junit-jupiter-api'
 	testRuntimeOnly    'org.junit.jupiter:junit-jupiter-engine'
+
+	testImplementation 'org.slf4j:slf4j-api:2.0.12' // Use the latest version
+	testImplementation 'org.projectlombok:lombok:1.18.30' // Use the latest version
+	testAnnotationProcessor 'org.projectlombok:lombok:1.18.30'
 }
 
 test {
