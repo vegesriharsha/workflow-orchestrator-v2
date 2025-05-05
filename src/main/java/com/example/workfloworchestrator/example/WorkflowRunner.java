@@ -94,9 +94,9 @@ class WorkflowRunner {
         storeTask.getConfiguration().put("url", "https://api.example.com/store");
         storeTask.getConfiguration().put("method", "POST");
 
-        workflow.getTasks().add(fetchTask);
-        workflow.getTasks().add(processTask);
-        workflow.getTasks().add(storeTask);
+        workflow.addTask(fetchTask);
+        workflow.addTask(processTask);
+        workflow.addTask(storeTask);
 
         // Save and execute workflow
         WorkflowDefinition savedWorkflow = workflowService.createWorkflowDefinition(workflow);

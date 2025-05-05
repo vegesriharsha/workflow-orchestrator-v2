@@ -53,4 +53,16 @@ public class WorkflowDefinition {
         PARALLEL,
         CONDITIONAL
     }
+
+    // Helper method to maintain bidirectional relationship
+    public void addTask(TaskDefinition task) {
+        tasks.add(task);
+        task.setWorkflowDefinition(this);
+    }
+
+    // Helper method to remove a task
+    public void removeTask(TaskDefinition task) {
+        tasks.remove(task);
+        task.setWorkflowDefinition(null);
+    }
 }

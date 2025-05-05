@@ -4,13 +4,14 @@ import com.example.workfloworchestrator.engine.WorkflowEngine;
 import com.example.workfloworchestrator.exception.WorkflowException;
 import com.example.workfloworchestrator.model.*;
 import com.example.workfloworchestrator.repository.WorkflowExecutionRepository;
-import com.example.workfloworchestrator.service.WorkflowService;
-import lombok.RequiredArgsConstructor;
+
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -59,8 +60,19 @@ public class WorkflowExecutionService {
         // Create workflow execution
         WorkflowExecution execution = createWorkflowExecution(workflowDefinition, variables);
 
-        // Start the workflow
-        workflowEngine.executeWorkflow(execution.getId());
+        // Save and flush to ensure the execution is in the database
+        WorkflowExecution savedExecution = workflowExecutionRepository.saveAndFlush(execution);
+
+        // Get the execution ID to use in the lambda
+        final Long executionId = savedExecution.getId();
+
+        // Register a synchronization to execute after the transaction commits
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                workflowEngine.executeWorkflow(executionId);
+            }
+        });
 
         return execution;
     }

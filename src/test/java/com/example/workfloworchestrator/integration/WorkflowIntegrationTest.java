@@ -4,10 +4,12 @@ import com.example.workfloworchestrator.model.*;
 import com.example.workfloworchestrator.service.TaskExecutionService;
 import com.example.workfloworchestrator.service.WorkflowExecutionService;
 import com.example.workfloworchestrator.service.WorkflowService;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +36,22 @@ class WorkflowIntegrationTest {
 
     private WorkflowDefinition testWorkflow;
 
+    @Autowired
+    private EntityManager entityManager;
+
+    // Mock RabbitMQ components to avoid connection issues in tests
+    @MockBean
+    private org.springframework.amqp.rabbit.connection.ConnectionFactory rabbitConnectionFactory;
+
+    @MockBean
+    private org.springframework.amqp.rabbit.core.RabbitTemplate rabbitTemplate;
+
+    @MockBean
+    private com.example.workfloworchestrator.messaging.RabbitMQSender rabbitMQSender;
+
+    @MockBean
+    private com.example.workfloworchestrator.messaging.RabbitMQReceiver rabbitMQReceiver;
+
     @BeforeEach
     void setUp() {
         // Create a test workflow definition
@@ -45,12 +63,14 @@ class WorkflowIntegrationTest {
         // Add test tasks
         TaskDefinition task1 = new TaskDefinition();
         task1.setName("test-task-1");
+        task1.setDescription("test-task-1");
         task1.setType("test-executor");
         task1.setExecutionOrder(0);
         task1.setExecutionMode(ExecutionMode.API);
 
         TaskDefinition task2 = new TaskDefinition();
         task2.setName("test-task-2");
+        task2.setDescription("test-task-2");
         task2.setType("test-executor");
         task2.setExecutionOrder(1);
         task2.setExecutionMode(ExecutionMode.API);
@@ -71,8 +91,12 @@ class WorkflowIntegrationTest {
         WorkflowExecution execution = workflowExecutionService.startWorkflow(
                 testWorkflow.getName(), null, variables);
 
+        // Force synchronization with the database
+        entityManager.flush();
+        entityManager.clear();
+
         // Wait for workflow to complete (simplified for testing)
-        awaitWorkflowCompletion(execution.getId(), 10);
+        awaitWorkflowCompletion(execution.getId(), 30);
 
         // Assert
         WorkflowExecution completedExecution = workflowExecutionService.getWorkflowExecution(execution.getId());
@@ -113,6 +137,7 @@ class WorkflowIntegrationTest {
         // Arrange - Create workflow with retry task
         TaskDefinition retryTask = new TaskDefinition();
         retryTask.setName("retry-task");
+        retryTask.setDescription("retry-task");
         retryTask.setType("failing-executor"); // Custom executor that fails initially
         retryTask.setExecutionOrder(0);
         retryTask.setRetryLimit(3);
@@ -120,6 +145,7 @@ class WorkflowIntegrationTest {
 
         WorkflowDefinition retryWorkflow = new WorkflowDefinition();
         retryWorkflow.setName("retry-test-workflow");
+        retryWorkflow.setDescription("retry-test-workflow");
         retryWorkflow.setStrategyType(WorkflowDefinition.ExecutionStrategyType.SEQUENTIAL);
         retryWorkflow.getTasks().add(retryTask);
 

@@ -23,6 +23,10 @@ public class TaskDefinition {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @ManyToOne
+    @JoinColumn(name = "workflow_definition_id")
+    private WorkflowDefinition workflowDefinition;
+
     @Column(nullable = false)
     private String name;
 
