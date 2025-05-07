@@ -23,26 +23,26 @@ public class WorkflowController {
     private final WorkflowService workflowService;
 
     @GetMapping
-    public ResponseEntity<List> getAllWorkflowDefinitions() {
+    public ResponseEntity<List<WorkflowDefinition>> getAllWorkflowDefinitions() {
         return ResponseEntity.ok(workflowService.getAllWorkflowDefinitions());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity getWorkflowDefinition(@PathVariable Long id) {
+    public ResponseEntity<WorkflowDefinition> getWorkflowDefinition(@PathVariable Long id) {
         return workflowService.getWorkflowDefinition(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/name/{name}")
-    public ResponseEntity getLatestWorkflowDefinition(@PathVariable String name) {
+    public ResponseEntity<WorkflowDefinition> getLatestWorkflowDefinition(@PathVariable String name) {
         return workflowService.getLatestWorkflowDefinition(name)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/name/{name}/version/{version}")
-    public ResponseEntity getWorkflowDefinitionByNameAndVersion(
+    public ResponseEntity<WorkflowDefinition> getWorkflowDefinitionByNameAndVersion(
             @PathVariable String name, @PathVariable String version) {
         return workflowService.getWorkflowDefinition(name, version)
                 .map(ResponseEntity::ok)
@@ -50,7 +50,7 @@ public class WorkflowController {
     }
 
     @PostMapping
-    public ResponseEntity createWorkflowDefinition(
+    public ResponseEntity<WorkflowDefinition> createWorkflowDefinition(
             @Valid @RequestBody WorkflowDefinition workflowDefinition) {
         return new ResponseEntity<>(
                 workflowService.createWorkflowDefinition(workflowDefinition),
@@ -58,13 +58,13 @@ public class WorkflowController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity updateWorkflowDefinition(
+    public ResponseEntity<WorkflowDefinition> updateWorkflowDefinition(
             @PathVariable Long id, @Valid @RequestBody WorkflowDefinition workflowDefinition) {
         return ResponseEntity.ok(workflowService.updateWorkflowDefinition(id, workflowDefinition));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity deleteWorkflowDefinition(@PathVariable Long id) {
+    public ResponseEntity<WorkflowDefinition> deleteWorkflowDefinition(@PathVariable Long id) {
         workflowService.deleteWorkflowDefinition(id);
         return ResponseEntity.noContent().build();
     }

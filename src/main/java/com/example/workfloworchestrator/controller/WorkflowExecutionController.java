@@ -1,5 +1,6 @@
 package com.example.workfloworchestrator.controller;
 
+import com.example.workfloworchestrator.model.TaskExecution;
 import com.example.workfloworchestrator.model.WorkflowExecution;
 import com.example.workfloworchestrator.model.WorkflowStatus;
 import com.example.workfloworchestrator.service.WorkflowExecutionService;
@@ -24,10 +25,10 @@ public class WorkflowExecutionController {
     private final WorkflowExecutionService workflowExecutionService;
 
     @PostMapping("/start")
-    public ResponseEntity startWorkflow(
+    public ResponseEntity<WorkflowExecution> startWorkflow(
             @RequestParam String workflowName,
             @RequestParam(required = false) String version,
-            @RequestBody(required = false) Map variables) {
+            @RequestBody(required = false) Map<String, String> variables) {
 
         WorkflowExecution execution = workflowExecutionService.startWorkflow(
                 workflowName, version, variables != null ? variables : Map.of());
@@ -36,19 +37,19 @@ public class WorkflowExecutionController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity getWorkflowExecution(@PathVariable Long id) {
+    public ResponseEntity<WorkflowExecution> getWorkflowExecution(@PathVariable Long id) {
         return ResponseEntity.ok(workflowExecutionService.getWorkflowExecution(id));
     }
 
     @GetMapping("/correlation/{correlationId}")
-    public ResponseEntity getWorkflowExecutionByCorrelationId(
+    public ResponseEntity<WorkflowExecution> getWorkflowExecutionByCorrelationId(
             @PathVariable String correlationId) {
         return ResponseEntity.ok(
                 workflowExecutionService.getWorkflowExecutionByCorrelationId(correlationId));
     }
 
     @GetMapping
-    public ResponseEntity<List> getWorkflowExecutionsByStatus(
+    public ResponseEntity<List<WorkflowExecution>> getWorkflowExecutionsByStatus(
             @RequestParam(required = false) WorkflowStatus status) {
 
         if (status != null) {
@@ -59,28 +60,28 @@ public class WorkflowExecutionController {
     }
 
     @PostMapping("/{id}/pause")
-    public ResponseEntity pauseWorkflowExecution(@PathVariable Long id) {
+    public ResponseEntity<WorkflowExecution> pauseWorkflowExecution(@PathVariable Long id) {
         return ResponseEntity.ok(workflowExecutionService.pauseWorkflowExecution(id));
     }
 
     @PostMapping("/{id}/resume")
-    public ResponseEntity resumeWorkflowExecution(@PathVariable Long id) {
+    public ResponseEntity<WorkflowExecution> resumeWorkflowExecution(@PathVariable Long id) {
         return ResponseEntity.ok(workflowExecutionService.resumeWorkflowExecution(id));
     }
 
     @PostMapping("/{id}/cancel")
-    public ResponseEntity cancelWorkflowExecution(@PathVariable Long id) {
+    public ResponseEntity<WorkflowExecution> cancelWorkflowExecution(@PathVariable Long id) {
         return ResponseEntity.ok(workflowExecutionService.cancelWorkflowExecution(id));
     }
 
     @PostMapping("/{id}/retry")
-    public ResponseEntity retryWorkflowExecution(@PathVariable Long id) {
+    public ResponseEntity<WorkflowExecution> retryWorkflowExecution(@PathVariable Long id) {
         return ResponseEntity.ok(workflowExecutionService.retryWorkflowExecution(id));
     }
 
     @PostMapping("/{id}/retry-subset")
-    public ResponseEntity retryWorkflowExecutionSubset(
-            @PathVariable Long id, @RequestBody List taskIds) {
+    public ResponseEntity<WorkflowExecution> retryWorkflowExecutionSubset(
+            @PathVariable Long id, @RequestBody List<Long> taskIds) {
         return ResponseEntity.ok(workflowExecutionService.retryWorkflowExecutionSubset(id, taskIds));
     }
 }

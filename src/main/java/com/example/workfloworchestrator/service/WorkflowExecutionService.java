@@ -60,11 +60,8 @@ public class WorkflowExecutionService {
         // Create workflow execution
         WorkflowExecution execution = createWorkflowExecution(workflowDefinition, variables);
 
-        // Save and flush to ensure the execution is in the database
-        WorkflowExecution savedExecution = workflowExecutionRepository.saveAndFlush(execution);
-
         // Get the execution ID to use in the lambda
-        final Long executionId = savedExecution.getId();
+        final Long executionId = execution.getId();
 
         // Register a synchronization to execute after the transaction commits
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
@@ -91,7 +88,7 @@ public class WorkflowExecutionService {
             execution.setVariables(variables);
         }
 
-        return workflowExecutionRepository.save(execution);
+        return workflowExecutionRepository.saveAndFlush(execution);
     }
 
     private WorkflowDefinition getWorkflowDefinition(String name, String version) {
