@@ -21,6 +21,18 @@ repositories {
 	mavenCentral()
 }
 
+/*bootJar {
+	mainClass = 'com.example.workfloworchestrator.WorkflowOrchestratorApplication'
+}
+
+bootRun {
+	mainClass = 'com.example.workfloworchestrator.WorkflowOrchestratorApplication'
+}*/
+
+springBoot {
+	mainClass = 'com.example.workfloworchestrator.WorkflowOrchestratorApplication'
+}
+
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
