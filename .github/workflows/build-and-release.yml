@@ -39,6 +39,8 @@ jobs:
       with:
         name: workflow-orchestrator-jar
         path: build/libs/*.jar
+        retention-days: 5
+        if-no-files-found: error
     
   release:
     needs: build
