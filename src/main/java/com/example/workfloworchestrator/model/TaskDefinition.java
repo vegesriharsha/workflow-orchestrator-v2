@@ -1,6 +1,8 @@
 package com.example.workfloworchestrator.model;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -27,12 +29,15 @@ public class TaskDefinition {
     @JoinColumn(name = "workflow_definition_id")
     private WorkflowDefinition workflowDefinition;
 
+    @NotBlank(message = "Task name is required")
     @Column(nullable = false)
     private String name;
 
+    @NotBlank(message = "Task description is required")
     @Column(nullable = false)
     private String description;
 
+    @NotBlank(message = "Task type is required")
     @Column(nullable = false)
     private String type;
 
@@ -52,6 +57,7 @@ public class TaskDefinition {
     @Column(name = "timeout_seconds")
     private Integer timeoutSeconds;
 
+    @NotNull(message = "Execution mode is required")
     @Column(name = "execution_mode")
     @Enumerated(EnumType.STRING)
     private ExecutionMode executionMode = ExecutionMode.API;

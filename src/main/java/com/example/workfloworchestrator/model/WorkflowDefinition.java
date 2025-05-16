@@ -1,6 +1,8 @@
 package com.example.workfloworchestrator.model;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -22,9 +24,11 @@ public class WorkflowDefinition {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @NotBlank(message = "Workflow name is required")
     @Column(nullable = false)
     private String name;
 
+    @NotBlank(message = "Workflow description is required")
     @Column(nullable = false)
     private String description;
 
@@ -44,6 +48,7 @@ public class WorkflowDefinition {
     @OneToMany(mappedBy = "workflowDefinition")
     private List<WorkflowExecution> executions = new ArrayList<>();
 
+    @NotNull(message = "Strategy type is required")
     @Column(name = "strategy_type", nullable = false)
     @Enumerated(EnumType.STRING)
     private ExecutionStrategyType strategyType = ExecutionStrategyType.SEQUENTIAL;
