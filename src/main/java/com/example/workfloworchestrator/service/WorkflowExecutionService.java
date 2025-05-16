@@ -91,7 +91,7 @@ public class WorkflowExecutionService {
         return workflowExecutionRepository.saveAndFlush(execution);
     }
 
-    private WorkflowDefinition getWorkflowDefinition(String name, String version) {
+    WorkflowDefinition getWorkflowDefinition(String name, String version) {
         if (version != null && !version.isEmpty()) {
             return workflowService.getWorkflowDefinition(name, version)
                     .orElseThrow(() -> new WorkflowException("Workflow definition not found with name: " + name + " and version: " + version));
