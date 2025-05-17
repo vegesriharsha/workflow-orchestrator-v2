@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -169,6 +170,14 @@ class RetrySchedulerTest {
 
         when(taskExecutionService.getTasksToRetry(any(LocalDateTime.class)))
                 .thenReturn(Arrays.asList(successTask, failTask, anotherSuccessTask));
+
+        // Mock successful execution for tasks 1 and 3 - return completed CompletableFuture
+        when(taskExecutionService.executeTask(1L))
+                .thenReturn(CompletableFuture.completedFuture(successTask));
+        when(taskExecutionService.executeTask(3L))
+                .thenReturn(CompletableFuture.completedFuture(anotherSuccessTask));
+
+        // Mock failure for task 2
         doThrow(new RuntimeException("Task retry failed"))
                 .when(taskExecutionService).executeTask(2L);
 

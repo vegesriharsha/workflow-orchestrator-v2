@@ -104,7 +104,7 @@ public class TaskExecutionService {
 
                 // Create execution context
                 ExecutionContext context = new ExecutionContext();
-                taskExecution.getInputs().forEach((key, value) -> context.setVariable(key, value));
+                taskExecution.getInputs().forEach(context::setVariable);
 
                 // Execute task
                 Map<String, Object> result = executor.execute(taskExecution.getTaskDefinition(), context);

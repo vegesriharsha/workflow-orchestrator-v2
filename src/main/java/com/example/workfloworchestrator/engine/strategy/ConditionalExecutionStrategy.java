@@ -239,6 +239,9 @@ public class ConditionalExecutionStrategy implements ExecutionStrategy {
 
         // If no explicit next tasks, evaluate conditional expressions
         if (nextTasks.isEmpty()) {
+            // Get all variables including outputs from completed tasks
+            Map<String, String> currentVariables = new HashMap<>(workflowExecution.getVariables());
+
             for (TaskDefinition task : allTasks) {
                 String condition = task.getConditionalExpression();
 
@@ -247,12 +250,15 @@ public class ConditionalExecutionStrategy implements ExecutionStrategy {
                     continue;
                 }
 
-                if (condition != null && !condition.isEmpty()) {
-                    boolean conditionMet = evaluateCondition(condition, workflowExecution.getVariables());
+                // Skip tasks without conditions
+                if (condition == null || condition.isEmpty()) {
+                    continue;
+                }
 
-                    if (conditionMet) {
-                        nextTasks.add(task);
-                    }
+                boolean conditionMet = evaluateCondition(condition, currentVariables);
+
+                if (conditionMet) {
+                    nextTasks.add(task);
                 }
             }
         }
