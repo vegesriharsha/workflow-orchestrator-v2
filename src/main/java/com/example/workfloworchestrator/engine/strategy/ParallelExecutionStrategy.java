@@ -182,6 +182,9 @@ public class ParallelExecutionStrategy implements ExecutionStrategy {
                     boolean continueOnError = false;
 
                     // Find tasks with next-on-failure paths
+                    List<TaskDefinition> errorHandlerTasks = new ArrayList<>();
+
+                    // Find tasks with next-on-failure paths
                     for (TaskExecution task : completedTasks) {
                         if (task.getStatus() == TaskStatus.FAILED &&
                                 task.getTaskDefinition().getNextTaskOnFailure() != null) {
@@ -196,15 +199,19 @@ public class ParallelExecutionStrategy implements ExecutionStrategy {
                                     .orElse(null);
 
                             if (errorHandlerTask != null) {
-                                // Create a new map with just this error handler task
-                                Map<Integer, List<TaskDefinition>> errorPath = new HashMap<>();
-                                errorPath.put(0, List.of(errorHandlerTask));
-
-                                // Execute the error path
-                                executeTaskGroups(workflowExecution, errorPath, resultFuture);
-                                return;
+                                errorHandlerTasks.add(errorHandlerTask);
                             }
                         }
+                    }
+
+                    if (!errorHandlerTasks.isEmpty()) {
+                        // Create a new map with all error handler tasks
+                        Map<Integer, List<TaskDefinition>> errorPath = new HashMap<>();
+                        errorPath.put(0, errorHandlerTasks);
+
+                        // Execute the error paths
+                        executeTaskGroups(workflowExecution, errorPath, resultFuture);
+                        return;
                     }
 
                     if (!continueOnError) {
