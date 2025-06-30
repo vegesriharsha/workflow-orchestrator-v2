@@ -395,6 +395,330 @@ public class PrioritizedExecutionStrategy implements ExecutionStrategy {
 }
 ```
 
+## JSON Attribute Extraction
+
+The workflow orchestrator includes a powerful JSON attribute extraction feature that enables dynamic request building for REST API tasks based on complex JSON workflow data. This feature eliminates the need for manual request body construction and provides flexible, configuration-driven attribute mapping.
+
+### Key Features
+
+- **RFC 6901 JsonPointer Extraction**: Standards-compliant JSON path extraction with support for nested objects
+- **Multi-location Support**: Extract attributes to request body, query parameters, path parameters, and headers
+- **Dynamic Transformations**: Built-in transformers for date formatting and value mapping
+- **Performance Optimization**: Intelligent caching with configurable TTL using Caffeine
+- **Database-driven Configuration**: Hot-configurable attribute mappings stored in the database
+- **Graceful Error Handling**: Optional field extraction with fallback, fail-fast for required fields
+
+### Architecture Overview
+
+The JSON attribute extraction system consists of several key components:
+
+```
+WorkflowData (JSON) → AttributeExtractor → Transformers → RestApiRequest
+                           ↓
+                   TaskAttributeMapping (Database Configuration)
+```
+
+#### Core Components
+
+1. **AttributeExtractor**: Interface for extraction strategies
+2. **JacksonJsonPointerExtractor**: RFC 6901 compliant JsonPointer implementation
+3. **AttributeTransformer**: Interface for value transformations
+4. **JsonAttributeExtractionService**: Main orchestration service with caching
+5. **TaskAttributeMapping**: JPA entity storing extraction configuration
+
+### Configuration Model
+
+Attribute mappings are stored in the database and define how to extract values from workflow JSON:
+
+```java
+@Entity
+@Table(name = "task_attribute_mappings")
+public class TaskAttributeMapping {
+    private String taskName;           // Target task name
+    private String sourcePath;         // JsonPointer path (e.g., "/customer/email")
+    private String targetField;        // Target field name
+    private HttpLocation httpLocation; // BODY, QUERY_PARAM, PATH_PARAM, HEADER
+    private TransformationType transformationType;
+    private String transformationConfig; // JSON configuration for transformers
+    private boolean required;           // Fail-fast if extraction fails
+}
+```
+
+### Usage Examples
+
+#### 1. Simple Field Extraction
+
+Extract customer email from workflow JSON to request body:
+
+```java
+// Database configuration
+TaskAttributeMapping mapping = new TaskAttributeMapping();
+mapping.setTaskName("create-customer");
+mapping.setSourcePath("/customer/personalInfo/email");
+mapping.setTargetField("email");
+mapping.setHttpLocation(HttpLocation.BODY);
+mapping.setRequired(true);
+
+// Workflow JSON input
+{
+  "customer": {
+    "personalInfo": {
+      "email": "john.doe@example.com",
+      "firstName": "John",
+      "lastName": "Doe"
+    },
+    "id": "12345"
+  }
+}
+
+// Generated request body
+{
+  "email": "john.doe@example.com"
+}
+```
+
+#### 2. Path Parameter Extraction
+
+Extract customer ID for URL path substitution:
+
+```java
+// Configuration
+mapping.setSourcePath("/customer/id");
+mapping.setTargetField("customerId");
+mapping.setHttpLocation(HttpLocation.PATH_PARAM);
+
+// URL template: /api/customers/{customerId}/profile
+// Result: /api/customers/12345/profile
+```
+
+#### 3. Date Format Transformation
+
+Transform date values for API compatibility:
+
+```java
+// Configuration
+mapping.setSourcePath("/customer/birthDate");
+mapping.setTargetField("dateOfBirth");
+mapping.setTransformationType(TransformationType.DATE_FORMAT);
+mapping.setTransformationConfig("""
+{
+  "inputFormat": "yyyy-MM-dd",
+  "outputFormat": "dd/MM/yyyy",
+  "timeZone": "UTC"
+}
+""");
+
+// Input: "1990-05-15"
+// Output: "15/05/1990"
+```
+
+#### 4. Value Mapping Transformation
+
+Map status codes for microservice expectations:
+
+```java
+// Configuration
+mapping.setSourcePath("/customer/status");
+mapping.setTargetField("statusCode");
+mapping.setTransformationType(TransformationType.VALUE_MAP);
+mapping.setTransformationConfig("""
+{
+  "mappings": {
+    "ACTIVE": "A",
+    "INACTIVE": "I",
+    "SUSPENDED": "S"
+  },
+  "defaultValue": "U",
+  "strict": false
+}
+""");
+
+// Input: "ACTIVE"
+// Output: "A"
+```
+
+#### 5. Header Extraction
+
+Extract correlation IDs for request headers:
+
+```java
+// Configuration
+mapping.setSourcePath("/request/traceId");
+mapping.setTargetField("X-Trace-ID");
+mapping.setHttpLocation(HttpLocation.HEADER);
+
+// Generated headers
+{
+  "X-Trace-ID": "abc-123-def-456",
+  "Content-Type": "application/json"
+}
+```
+
+### Advanced Configuration
+
+#### Complex Nested Extraction
+
+```java
+// Workflow JSON
+{
+  "order": {
+    "customer": {
+      "billing": {
+        "address": {
+          "street": "123 Main St",
+          "city": "New York",
+          "zipCode": "10001"
+        }
+      }
+    },
+    "items": [
+      {"id": "item1", "quantity": 2},
+      {"id": "item2", "quantity": 1}
+    ]
+  }
+}
+
+// Multiple attribute mappings
+"/order/customer/billing/address/street" → "billingStreet" (BODY)
+"/order/customer/billing/address/city" → "billingCity" (BODY)
+"/order/customer/billing/address/zipCode" → "zipCode" (QUERY_PARAM)
+"/order/items/0/id" → "primaryItemId" (PATH_PARAM)
+```
+
+#### Conditional Extraction
+
+```java
+// Configuration with conditional logic
+mapping.setTransformationConfig("""
+{
+  "condition": "notNull",
+  "defaultValue": "unknown",
+  "fallbackPath": "/customer/defaultEmail"
+}
+""");
+```
+
+### Integration with Workflow Engine
+
+The extraction service integrates seamlessly with the existing workflow engine:
+
+```java
+@Service
+public class RestApiTaskExecutor extends AbstractTaskExecutor {
+    
+    @Override
+    protected Map<String, Object> doExecute(TaskDefinition taskDefinition, ExecutionContext context) {
+        // Check if JSON extraction is configured
+        RestApiRequest extractedRequest = jsonAttributeExtractionService
+            .buildRequest(taskDefinition.getName(), context.getWorkflowData());
+        
+        if (extractedRequest != null) {
+            // Use extracted request components
+            return executeWithExtractedRequest(extractedRequest, taskDefinition, context);
+        } else {
+            // Fall back to existing configuration-based approach
+            return executeWithConfiguration(taskDefinition, context);
+        }
+    }
+}
+```
+
+### Performance Characteristics
+
+The JSON attribute extraction system is designed for high performance:
+
+- **Sub-millisecond extraction**: Optimized JsonPointer implementation
+- **Intelligent caching**: Caffeine cache with configurable TTL (default: 30 minutes)
+- **Minimal memory footprint**: Streaming JSON processing where possible
+- **Scalable**: Supports workflows with thousands of attributes
+
+### Management API
+
+REST endpoints for managing attribute mappings:
+
+```java
+// Get mappings for a specific task
+GET /api/v1/attribute-mappings/task/{taskName}
+
+// Create new mapping
+POST /api/v1/attribute-mappings
+{
+  "taskName": "user-service",
+  "sourcePath": "/user/profile/email",
+  "targetField": "userEmail",
+  "httpLocation": "BODY",
+  "required": true
+}
+
+// Update existing mapping
+PUT /api/v1/attribute-mappings/{id}
+
+// Delete mapping
+DELETE /api/v1/attribute-mappings/{id}
+```
+
+### Error Handling
+
+The system provides comprehensive error handling:
+
+```java
+// Required field missing
+{
+  "error": "EXTRACTION_FAILED",
+  "message": "Required field 'customerId' not found at path '/customer/id'",
+  "taskName": "create-customer",
+  "sourcePath": "/customer/id"
+}
+
+// Transformation error
+{
+  "error": "TRANSFORMATION_FAILED",
+  "message": "Date format transformation failed: Invalid date format",
+  "inputValue": "invalid-date",
+  "transformationType": "DATE_FORMAT"
+}
+
+// Optional field handling
+// Missing optional fields are skipped silently
+// Default values are applied when configured
+```
+
+### Testing Support
+
+Comprehensive testing utilities for attribute extraction:
+
+```java
+@Test
+void shouldExtractMultipleAttributesForComplexWorkflow() {
+    // Given: complex workflow JSON
+    JsonNode workflowData = createComplexWorkflowData();
+    
+    // When: extracting attributes for microservice call
+    RestApiRequest request = jsonAttributeExtractionService
+        .buildRequest("user-service", workflowData);
+    
+    // Then: verify all expected attributes extracted correctly
+    assertThat(request.getBody())
+        .hasFieldOrPropertyWithValue("email", "john@example.com")
+        .hasFieldOrPropertyWithValue("firstName", "John");
+    
+    assertThat(request.getPathParams())
+        .containsEntry("userId", "12345");
+        
+    assertThat(request.getHeaders())
+        .containsEntry("X-Correlation-ID", "abc-123");
+}
+```
+
+### Migration and Backward Compatibility
+
+The JSON attribute extraction feature is designed for seamless integration:
+
+- **Backward compatible**: Existing workflows continue to work unchanged
+- **Gradual adoption**: Can be enabled per task as needed
+- **Fallback mechanism**: Automatic fallback to configuration-based approach
+- **Zero downtime**: Hot configuration updates without restart
+
 ## Advanced Features
 
 ### Complex Workflow Patterns
