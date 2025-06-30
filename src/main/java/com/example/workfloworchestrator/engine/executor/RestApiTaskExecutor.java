@@ -1,5 +1,7 @@
 package com.example.workfloworchestrator.engine.executor;
 
+import com.example.workfloworchestrator.json.model.RestApiRequest;
+import com.example.workfloworchestrator.json.service.JsonAttributeExtractionService;
 import com.example.workfloworchestrator.model.ExecutionContext;
 import com.example.workfloworchestrator.model.TaskDefinition;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -10,6 +12,7 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -27,6 +30,7 @@ public class RestApiTaskExecutor extends AbstractTaskExecutor {
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+    private final JsonAttributeExtractionService jsonAttributeExtractionService;
 
     @Override
     public String getTaskType() {
@@ -53,6 +57,88 @@ public class RestApiTaskExecutor extends AbstractTaskExecutor {
     protected Map<String, Object> doExecute(TaskDefinition taskDefinition, ExecutionContext context)
             throws Exception {
 
+        // Set current task name in context
+        context.setCurrentTaskName(taskDefinition.getName());
+
+        // Check if JSON attribute extraction is configured and available
+        if (context.hasWorkflowData() && hasAttributeExtractionConfigured(taskDefinition.getName())) {
+            return executeWithJsonExtraction(taskDefinition, context);
+        } else {
+            // Fall back to existing configuration-based approach
+            return executeWithConfiguration(taskDefinition, context);
+        }
+    }
+
+    /**
+     * Check if attribute extraction is configured for a task
+     * @param taskName the task name
+     * @return true if mappings exist for this task
+     */
+    private boolean hasAttributeExtractionConfigured(String taskName) {
+        try {
+            return !jsonAttributeExtractionService.getMappingsForTask(taskName).isEmpty();
+        } catch (Exception e) {
+            log.warn("Failed to check attribute mappings for task {}: {}", taskName, e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Execute task using JSON attribute extraction
+     */
+    private Map<String, Object> executeWithJsonExtraction(TaskDefinition taskDefinition, ExecutionContext context)
+            throws Exception {
+
+        log.debug("Executing task with JSON extraction: {}", taskDefinition.getName());
+
+        // Extract attributes and build request
+        RestApiRequest extractedRequest = jsonAttributeExtractionService
+                .buildRequest(taskDefinition, context.getWorkflowData());
+
+        // Get base configuration
+        Map<String, String> config = processConfigVariables(taskDefinition.getConfiguration(), context);
+        String baseUrl = getRequiredConfig(config, "url");
+        String method = getRequiredConfig(config, "method").toUpperCase();
+
+        // Build final URL with path parameters
+        String finalUrl = buildUrlWithPathParams(baseUrl, extractedRequest.getPathParams());
+
+        // Add query parameters to URL
+        if (extractedRequest.hasQueryParams()) {
+            finalUrl = buildUrlWithQueryParams(finalUrl, extractedRequest.getQueryParams());
+        }
+
+        // Create headers combining context headers and extracted headers
+        HttpHeaders headers = createHeaders(context);
+        addExtractedHeaders(headers, extractedRequest.getHeaders());
+
+        // Create request body
+        String requestBody = null;
+        if (extractedRequest.hasBody()) {
+            requestBody = objectMapper.writeValueAsString(extractedRequest.getBody());
+        }
+
+        // Execute request
+        ResponseEntity<String> response = executeRequest(finalUrl, method, requestBody, headers);
+
+        // Process and return response
+        Map<String, Object> result = processResponse(response, context);
+        
+        // Add extraction metadata
+        result.put("extractedAttributeCount", extractedRequest.getTotalAttributeCount());
+        result.put("usedJsonExtraction", true);
+
+        return result;
+    }
+
+    /**
+     * Execute task using traditional configuration approach
+     */
+    private Map<String, Object> executeWithConfiguration(TaskDefinition taskDefinition, ExecutionContext context)
+            throws Exception {
+
+        log.debug("Executing task with configuration: {}", taskDefinition.getName());
+
         // Get and process configuration
         Map<String, String> config = processConfigVariables(taskDefinition.getConfiguration(), context);
 
@@ -67,8 +153,11 @@ public class RestApiTaskExecutor extends AbstractTaskExecutor {
         // Execute request based on method
         ResponseEntity<String> response = executeRequest(url, method, requestBody, headers);
 
-        // Process response
-        return processResponse(response, context);
+        // Process and return response
+        Map<String, Object> result = processResponse(response, context);
+        result.put("usedJsonExtraction", false);
+
+        return result;
     }
 
     /**
@@ -181,6 +270,48 @@ public class RestApiTaskExecutor extends AbstractTaskExecutor {
         return result;
     }
 
+    /**
+     * Build URL with path parameters
+     */
+    private String buildUrlWithPathParams(String baseUrl, Map<String, String> pathParams) {
+        if (pathParams == null || pathParams.isEmpty()) {
+            return baseUrl;
+        }
+
+        String url = baseUrl;
+        for (Map.Entry<String, String> entry : pathParams.entrySet()) {
+            String placeholder = "{" + entry.getKey() + "}";
+            url = url.replace(placeholder, entry.getValue());
+        }
+        return url;
+    }
+
+    /**
+     * Build URL with query parameters
+     */
+    private String buildUrlWithQueryParams(String baseUrl, Map<String, String> queryParams) {
+        if (queryParams == null || queryParams.isEmpty()) {
+            return baseUrl;
+        }
+
+        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(baseUrl);
+        for (Map.Entry<String, String> entry : queryParams.entrySet()) {
+            builder.queryParam(entry.getKey(), entry.getValue());
+        }
+        return builder.toUriString();
+    }
+
+    /**
+     * Add extracted headers to existing headers
+     */
+    private void addExtractedHeaders(HttpHeaders headers, Map<String, String> extractedHeaders) {
+        if (extractedHeaders != null && !extractedHeaders.isEmpty()) {
+            for (Map.Entry<String, String> entry : extractedHeaders.entrySet()) {
+                headers.add(entry.getKey(), entry.getValue());
+            }
+        }
+    }
+
     @Override
     protected Map<String, Object> postProcessResult(Map<String, Object> result, ExecutionContext context) {
         // Add execution timestamp
@@ -189,8 +320,10 @@ public class RestApiTaskExecutor extends AbstractTaskExecutor {
         // Log response summary
         Integer statusCode = (Integer) result.get("statusCode");
         Boolean success = (Boolean) result.get("success");
+        Boolean usedJsonExtraction = (Boolean) result.getOrDefault("usedJsonExtraction", false);
 
-        log.info("REST API response: statusCode={}, success={}", statusCode, success);
+        log.info("REST API response: statusCode={}, success={}, usedJsonExtraction={}", 
+                statusCode, success, usedJsonExtraction);
 
         return result;
     }

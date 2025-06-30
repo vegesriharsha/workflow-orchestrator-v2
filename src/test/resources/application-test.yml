@@ -1,28 +1,48 @@
-# src/test/resources/application-test.yml
 spring:
   application:
     name: workflow-orchestrator-test
-
-  # Use H2 in-memory database for tests
+  
   datasource:
-    url: jdbc:h2:mem:workflow_db
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
     username: sa
-    password:
+    password: 
     driver-class-name: org.h2.Driver
-
+  
   jpa:
-    database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
       ddl-auto: create-drop
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
+    database-platform: org.hibernate.dialect.H2Dialect
+  
+  h2:
+    console:
+      enabled: false
+  
+  flyway:
+    enabled: false  # Disable Flyway for tests, use JPA schema generation instead
+  
+  cache:
+    type: simple  # Use simple caching for tests
 
-# Logging configuration for tests
+# Test-specific logging
 logging:
   level:
     com.example.workfloworchestrator: DEBUG
-    org.springframework: INFO
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type: INFO
+    org.springframework.cache: DEBUG
+    org.hibernate.SQL: WARN
+    org.hibernate.type.descriptor.sql.BasicBinder: WARN
+
+# Test workflow configuration
+workflow:
+  task:
+    execution:
+      thread-pool-size: 2
+    retry:
+      max-attempts: 1
+      initial-interval: 100
+      multiplier: 1.0
+  events:
+    enabled: false  # Disable events for most tests
