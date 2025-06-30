@@ -22,6 +22,7 @@ class WorkflowRunner {
     private final WorkflowExecutionService workflowExecutionService;
     private final UserReviewService userReviewService;
     private final TaskExecutionService taskExecutionService;
+    private final TaskAttributeExtractionExample taskAttributeExtractionExample;
 
     public void runExample() {
         Scanner scanner = new Scanner(System.in);
@@ -32,9 +33,10 @@ class WorkflowRunner {
         log.info("2. Workflow with User Review");
         log.info("3. Parallel Workflow");
         log.info("4. Conditional Workflow");
-        log.info("5. Exit");
+        log.info("5. JSON Attribute Extraction Workflow (NEW!)");
+        log.info("6. Exit");
 
-        System.out.print("Enter your choice (1-5): ");
+        System.out.print("Enter your choice (1-6): ");
         int choice = scanner.nextInt();
 
         switch (choice) {
@@ -51,6 +53,9 @@ class WorkflowRunner {
                 runConditionalWorkflow();
                 break;
             case 5:
+                runJsonAttributeExtractionWorkflow();
+                break;
+            case 6:
                 log.info("Exiting...");
                 return;
             default:
@@ -356,6 +361,11 @@ class WorkflowRunner {
         } catch (Exception e) {
             log.error("Error running workflow", e);
         }
+    }
+
+    private void runJsonAttributeExtractionWorkflow() {
+        log.info("\n=== Running JSON Attribute Extraction Workflow ===");
+        taskAttributeExtractionExample.runExample();
     }
 
     private void handleUserReview(WorkflowExecution execution) {
